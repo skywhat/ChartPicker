@@ -28,7 +28,6 @@ class ConstructChart(object):
         plt.gca()
         self.xfmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
         self.ax.xaxis.set_major_formatter(self.xfmt)
-        self.fig.canvas.mpl_connect('pick_event',self.on_pick)
 
 
         #There are a variety of meanings of the picker property https://matplotlib.org/examples/event_handling/pick_event_demo.html
@@ -36,12 +35,11 @@ class ConstructChart(object):
         self.line = plt.plot(self.datenums, self.values, '_', marker=r'8',picker=5)
         #点击其中的point显示x,y info
         datacursor(self.line)
+        self.fig.canvas.mpl_connect('pick_event', self.on_pick)
         plt.show()
 
-    def on_pick(self, event):
+    def on_pick(self,event):
         self.index = event.ind
-        #xy=event.artist.get_offsets()
-        #print xy[self.index]
         print 'onpick:', self.index, np.take(self.datenums, self.index), np.take(self.values, self.index)
 
 if __name__=='__main__':
