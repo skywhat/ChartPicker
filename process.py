@@ -19,9 +19,11 @@ class ConstructChart(object):
         self.values=self.data_points.values
         self.dates=[dt.datetime.fromtimestamp(ts) for ts in self.test_timeArray]
         self.datenums=md.date2num(self.dates)
-        #self.fig=plt.figure(figsize=(8,4))
-        #self.ax =self.fig.add_subplot(111)
-        self.fig,self.ax=plt.subplots()
+        #self.dpi=100
+        #self.fig=plt.Figure((3.0, 3.0), dpi=self.dpi)
+        self.fig=plt.figure(figsize=(8,4))
+        self.ax =self.fig.add_subplot(111)
+        #self.fig,self.ax=plt.subplots()
         #self.ax=plt.subplot()
         plt.subplots_adjust(bottom=0.2)
         plt.xticks(rotation=25)
@@ -32,11 +34,11 @@ class ConstructChart(object):
 
         #There are a variety of meanings of the picker property https://matplotlib.org/examples/event_handling/pick_event_demo.html
         # markers example https://matplotlib.org/examples/lines_bars_and_markers/marker_reference.html
-        self.line = plt.plot(self.datenums, self.values, '_', marker=r'8',picker=5)
+        self.line = plt.plot(self.datenums, self.values, '_', marker=r'8',picker=2)
         #点击其中的point显示x,y info
         datacursor(self.line)
         self.fig.canvas.mpl_connect('pick_event', self.on_pick)
-        plt.show()
+        #plt.show()
 
     def on_pick(self,event):
         self.index = event.ind

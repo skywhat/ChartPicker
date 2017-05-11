@@ -1,132 +1,52 @@
 """
-This demo demonstrates how to draw a dynamic mpl (matplotlib)
-plot in a wxPython application.
-It allows "live" plotting as well as manual zooming to specific
-regions.
-Both X and Y axes allow "auto" or "manual" settings. For Y, auto
-mode sets the scaling of the graph to see all the data points.
-For X, auto mode makes the graph "follow" the data. Set it X min
-to manual 0 to always see the whole data from the beginning.
-Note: press Enter in the 'manual' text box to make a new value
-affect the plot.
+This demo demonstrates how to embed a matplotlib (mpl) plot
+into a wxPython GUI application, including:
+
+* Using the navigation toolbar
+* Adding data to the plot
+* Dynamically modifying the plot's properties
+* Processing mpl events
+* Saving the plot to a file from a menu
+
+The main goal is to serve as a basis for developing rich wx GUI
+applications featuring mpl plots (using the mpl OO API).
+
 Eli Bendersky (eliben@gmail.com)
 License: this code is in the public domain
-Last modified: 31.07.2008
+Last modified: 30.07.2008
 """
 import os
 import pprint
 import random
-import sys
 import wx
 
 # The recommended way to use wx with mpl is with the WXAgg
 # backend.
 #
 import matplotlib
-
 matplotlib.use('WXAgg')
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_wxagg import \
     FigureCanvasWxAgg as FigCanvas, \
     NavigationToolbar2WxAgg as NavigationToolbar
-import numpy as np
-import pylab
 
 
-class DataGen(object):
-    """ A silly class that generates pseudo-random data for
-        display in the plot.
-    """
-
-    def __init__(self, init=50):
-        self.data = self.init = init
-
-    def next(self):
-        self._recalc_data()
-        return self.data
-
-    def _recalc_data(self):
-        delta = random.uniform(-0.5, 0.5)
-        r = random.random()
-
-        if r > 0.9:
-            self.data += delta * 15
-        elif r > 0.8:
-            # attraction to the initial value
-            delta += (0.5 if self.init > self.data else -0.5)
-            self.data += delta
-        else:
-            self.data += delta
-
-
-class BoundControlBox(wx.Panel):
-    """ A static box with a couple of radio buttons and a text
-        box. Allows to switch between an automatic mode and a
-        manual mode with an associated value.
-    """
-
-    def __init__(self, parent, ID, label, initval):
-        wx.Panel.__init__(self, parent, ID)
-
-        self.value = initval
-
-        box = wx.StaticBox(self, -1, label)
-        sizer = wx.StaticBoxSizer(box, wx.VERTICAL)
-
-        self.radio_auto = wx.RadioButton(self, -1,
-                                         label="Auto", style=wx.RB_GROUP)
-        self.radio_manual = wx.RadioButton(self, -1,
-                                           label="Manual")
-        self.manual_text = wx.TextCtrl(self, -1,
-                                       size=(35, -1),
-                                       value=str(initval),
-                                       style=wx.TE_PROCESS_ENTER)
-
-        self.Bind(wx.EVT_UPDATE_UI, self.on_update_manual_text, self.manual_text)
-        self.Bind(wx.EVT_TEXT_ENTER, self.on_text_enter, self.manual_text)
-
-        manual_box = wx.BoxSizer(wx.HORIZONTAL)
-        manual_box.Add(self.radio_manual, flag=wx.ALIGN_CENTER_VERTICAL)
-        manual_box.Add(self.manual_text, flag=wx.ALIGN_CENTER_VERTICAL)
-
-        sizer.Add(self.radio_auto, 0, wx.ALL, 10)
-        sizer.Add(manual_box, 0, wx.ALL, 10)
-
-        self.SetSizer(sizer)
-        sizer.Fit(self)
-
-    def on_update_manual_text(self, event):
-        self.manual_text.Enable(self.radio_manual.GetValue())
-
-    def on_text_enter(self, event):
-        self.value = self.manual_text.GetValue()
-
-    def is_auto(self):
-        return self.radio_auto.GetValue()
-
-    def manual_value(self):
-        return self.value
-
-
-class GraphFrame(wx.Frame):
+class BarsFrame(wx.Frame):
     """ The main frame of the application
     """
-    title = 'Demo: dynamic matplotlib graph'
+    title = 'Demo: wxPython with matplotlib'
 
     def __init__(self):
         wx.Frame.__init__(self, None, -1, self.title)
 
-        self.datagen = DataGen()
-        self.data = [self.datagen.next()]
-        self.paused = False
+        self.data = [5, 6, 9, 14]
 
         self.create_menu()
         self.create_status_bar()
         self.create_main_panel()
 
-        self.redraw_timer = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self.on_redraw_timer, self.redraw_timer)
-        self.redraw_timer.Start(100)
+        self.textbox.SetValue(' '.join(map(str, self.data)))
+        self.draw_figure()
 
     def create_menu(self):
         self.menubar = wx.MenuBar()
@@ -138,54 +58,87 @@ class GraphFrame(wx.Frame):
         m_exit = menu_file.Append(-1, "E&xit\tCtrl-X", "Exit")
         self.Bind(wx.EVT_MENU, self.on_exit, m_exit)
 
+        menu_help = wx.Menu()
+        m_about = menu_help.Append(-1, "&About\tF1", "About the demo")
+        self.Bind(wx.EVT_MENU, self.on_about, m_about)
+
         self.menubar.Append(menu_file, "&File")
+        self.menubar.Append(menu_help, "&Help")
         self.SetMenuBar(self.menubar)
 
     def create_main_panel(self):
+        """ Creates the main panel with all the controls on it:
+             * mpl canvas
+             * mpl navigation toolbar
+             * Control panel for interaction
+        """
         self.panel = wx.Panel(self)
 
-        self.init_plot()
+        # Create the mpl Figure and FigCanvas objects.
+        # 5x4 inches, 100 dots-per-inch
+        #
+        self.dpi = 100
+        self.fig = Figure((5.0, 4.0), dpi=self.dpi)
         self.canvas = FigCanvas(self.panel, -1, self.fig)
 
-        self.xmin_control = BoundControlBox(self.panel, -1, "X min", 0)
-        self.xmax_control = BoundControlBox(self.panel, -1, "X max", 50)
-        self.ymin_control = BoundControlBox(self.panel, -1, "Y min", 0)
-        self.ymax_control = BoundControlBox(self.panel, -1, "Y max", 100)
+        # Since we have only one plot, we can use add_axes
+        # instead of add_subplot, but then the subplot
+        # configuration tool in the navigation toolbar wouldn't
+        # work.
+        #
+        self.axes = self.fig.add_subplot(111)
 
-        self.pause_button = wx.Button(self.panel, -1, "Pause")
-        self.Bind(wx.EVT_BUTTON, self.on_pause_button, self.pause_button)
-        self.Bind(wx.EVT_UPDATE_UI, self.on_update_pause_button, self.pause_button)
+        # Bind the 'pick' event for clicking on one of the bars
+        #
+        self.canvas.mpl_connect('pick_event', self.on_pick)
+
+        self.textbox = wx.TextCtrl(
+            self.panel,
+            size=(200,-1),
+            style=wx.TE_PROCESS_ENTER)
+        self.Bind(wx.EVT_TEXT_ENTER, self.on_text_enter, self.textbox)
+
+        self.drawbutton = wx.Button(self.panel, -1, "Draw!")
+        self.Bind(wx.EVT_BUTTON, self.on_draw_button, self.drawbutton)
 
         self.cb_grid = wx.CheckBox(self.panel, -1,
-                                   "Show Grid",
-                                   style=wx.ALIGN_RIGHT)
+            "Show Grid",
+            style=wx.ALIGN_RIGHT)
         self.Bind(wx.EVT_CHECKBOX, self.on_cb_grid, self.cb_grid)
-        self.cb_grid.SetValue(True)
 
-        self.cb_xlab = wx.CheckBox(self.panel, -1,
-                                   "Show X labels",
-                                   style=wx.ALIGN_RIGHT)
-        self.Bind(wx.EVT_CHECKBOX, self.on_cb_xlab, self.cb_xlab)
-        self.cb_xlab.SetValue(True)
+        self.slider_label = wx.StaticText(self.panel, -1,
+            "Bar width (%): ")
+        self.slider_width = wx.Slider(self.panel, -1,
+            value=20,
+            minValue=1,
+            maxValue=100,
+            style=wx.SL_AUTOTICKS | wx.SL_LABELS)
+        self.slider_width.SetTickFreq(10)
+        self.Bind(wx.EVT_COMMAND_SCROLL_THUMBTRACK, self.on_slider_width, self.slider_width)
 
-        self.hbox1 = wx.BoxSizer(wx.HORIZONTAL)
-        self.hbox1.Add(self.pause_button, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
-        self.hbox1.AddSpacer(20)
-        self.hbox1.Add(self.cb_grid, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
-        self.hbox1.AddSpacer(10)
-        self.hbox1.Add(self.cb_xlab, border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
+        # Create the navigation toolbar, tied to the canvas
+        #
+        self.toolbar = NavigationToolbar(self.canvas)
 
-        self.hbox2 = wx.BoxSizer(wx.HORIZONTAL)
-        self.hbox2.Add(self.xmin_control, border=5, flag=wx.ALL)
-        self.hbox2.Add(self.xmax_control, border=5, flag=wx.ALL)
-        self.hbox2.AddSpacer(24)
-        self.hbox2.Add(self.ymin_control, border=5, flag=wx.ALL)
-        self.hbox2.Add(self.ymax_control, border=5, flag=wx.ALL)
+        #
+        # Layout with box sizers
+        #
 
         self.vbox = wx.BoxSizer(wx.VERTICAL)
-        self.vbox.Add(self.canvas, 1, flag=wx.LEFT | wx.TOP | wx.GROW)
-        self.vbox.Add(self.hbox1, 0, flag=wx.ALIGN_LEFT | wx.TOP)
-        self.vbox.Add(self.hbox2, 0, flag=wx.ALIGN_LEFT | wx.TOP)
+        self.vbox.Add(self.canvas, 1, wx.LEFT | wx.TOP | wx.GROW)
+        self.vbox.Add(self.toolbar, 0, wx.EXPAND)
+        self.vbox.AddSpacer(10)
+
+        self.hbox = wx.BoxSizer(wx.HORIZONTAL)
+        flags = wx.ALIGN_LEFT | wx.ALL | wx.ALIGN_CENTER_VERTICAL
+        self.hbox.Add(self.textbox, 0, border=3, flag=flags)
+        self.hbox.Add(self.drawbutton, 0, border=3, flag=flags)
+        self.hbox.Add(self.cb_grid, 0, border=3, flag=flags)
+        self.hbox.AddSpacer(30)
+        self.hbox.Add(self.slider_label, 0, flag=flags)
+        self.hbox.Add(self.slider_width, 0, border=3, flag=flags)
+
+        self.vbox.Add(self.hbox, 0, flag = wx.ALIGN_LEFT | wx.TOP)
 
         self.panel.SetSizer(self.vbox)
         self.vbox.Fit(self)
@@ -193,97 +146,58 @@ class GraphFrame(wx.Frame):
     def create_status_bar(self):
         self.statusbar = self.CreateStatusBar()
 
-    def init_plot(self):
-        self.dpi = 100
-        self.fig = Figure((3.0, 3.0), dpi=self.dpi)
-
-        self.axes = self.fig.add_subplot(111)
-        self.axes.set_axis_bgcolor('black')
-        self.axes.set_title('Very important random data', size=12)
-
-        pylab.setp(self.axes.get_xticklabels(), fontsize=8)
-        pylab.setp(self.axes.get_yticklabels(), fontsize=8)
-
-        # plot the data as a line series, and save the reference
-        # to the plotted line series
-        #
-        self.plot_data = self.axes.plot(
-            self.data,
-            linewidth=1,
-            color=(1, 1, 0),
-        )[0]
-
-    def draw_plot(self):
-        """ Redraws the plot
+    def draw_figure(self):
+        """ Redraws the figure
         """
-        # when xmin is on auto, it "follows" xmax to produce a
-        # sliding window effect. therefore, xmin is assigned after
-        # xmax.
+        str = self.textbox.GetValue()
+        self.data = map(int, str.split())
+        x = range(len(self.data))
+
+        # clear the axes and redraw the plot anew
         #
-        if self.xmax_control.is_auto():
-            xmax = len(self.data) if len(self.data) > 50 else 50
-        else:
-            xmax = int(self.xmax_control.manual_value())
+        self.axes.clear()
+        self.axes.grid(self.cb_grid.IsChecked())
 
-        if self.xmin_control.is_auto():
-            xmin = xmax - 50
-        else:
-            xmin = int(self.xmin_control.manual_value())
-
-        # for ymin and ymax, find the minimal and maximal values
-        # in the data set and add a mininal margin.
-        #
-        # note that it's easy to change this scheme to the
-        # minimal/maximal value in the current display, and not
-        # the whole data set.
-        #
-        if self.ymin_control.is_auto():
-            ymin = round(min(self.data), 0) - 1
-        else:
-            ymin = int(self.ymin_control.manual_value())
-
-        if self.ymax_control.is_auto():
-            ymax = round(max(self.data), 0) + 1
-        else:
-            ymax = int(self.ymax_control.manual_value())
-
-        self.axes.set_xbound(lower=xmin, upper=xmax)
-        self.axes.set_ybound(lower=ymin, upper=ymax)
-
-        # anecdote: axes.grid assumes b=True if any other flag is
-        # given even if b is set to False.
-        # so just passing the flag into the first statement won't
-        # work.
-        #
-        if self.cb_grid.IsChecked():
-            self.axes.grid(True, color='gray')
-        else:
-            self.axes.grid(False)
-
-        # Using setp here is convenient, because get_xticklabels
-        # returns a list over which one needs to explicitly
-        # iterate, and setp already handles this.
-        #
-        pylab.setp(self.axes.get_xticklabels(),
-                   visible=self.cb_xlab.IsChecked())
-
-        self.plot_data.set_xdata(np.arange(len(self.data)))
-        self.plot_data.set_ydata(np.array(self.data))
+        self.axes.bar(
+            left=x,
+            height=self.data,
+            width=self.slider_width.GetValue() / 100.0,
+            align='center',
+            alpha=0.44,
+            picker=5)
 
         self.canvas.draw()
 
-    def on_pause_button(self, event):
-        self.paused = not self.paused
-
-    def on_update_pause_button(self, event):
-        label = "Resume" if self.paused else "Pause"
-        self.pause_button.SetLabel(label)
-
     def on_cb_grid(self, event):
-        self.draw_plot()
+        self.draw_figure()
 
-    def on_cb_xlab(self, event):
-        self.draw_plot()
+    def on_slider_width(self, event):
+        self.draw_figure()
+
+    def on_draw_button(self, event):
+        self.draw_figure()
+
+    def on_pick(self, event):
+        # The event received here is of the type
+        # matplotlib.backend_bases.PickEvent
+        #
+        # It carries lots of information, of which we're using
+        # only a small amount here.
+        #
+        box_points = event.artist.get_bbox().get_points()
+        msg = "You've clicked on a bar with coords:\n %s" % box_points
+
+        dlg = wx.MessageDialog(
+            self,
+            msg,
+            "Click!",
+            wx.OK | wx.ICON_INFORMATION)
+
+        dlg.ShowModal()
+        dlg.Destroy()
+
+    def on_text_enter(self, event):
+        self.draw_figure()
 
     def on_save_plot(self, event):
         file_choices = "PNG (*.png)|*.png"
@@ -301,17 +215,22 @@ class GraphFrame(wx.Frame):
             self.canvas.print_figure(path, dpi=self.dpi)
             self.flash_status_message("Saved to %s" % path)
 
-    def on_redraw_timer(self, event):
-        # if paused do not add data, but still redraw the plot
-        # (to respond to scale modifications, grid change, etc.)
-        #
-        if not self.paused:
-            self.data.append(self.datagen.next())
-
-        self.draw_plot()
-
     def on_exit(self, event):
         self.Destroy()
+
+    def on_about(self, event):
+        msg = """ A demo using wxPython with matplotlib:
+
+         * Use the matplotlib navigation bar
+         * Add values to the text box and press Enter (or click "Draw!")
+         * Show or hide the grid
+         * Drag the slider to modify the width of the bars
+         * Save the plot to a file using the File menu
+         * Click on a bar to receive an informative message
+        """
+        dlg = wx.MessageDialog(self, msg, "About", wx.OK)
+        dlg.ShowModal()
+        dlg.Destroy()
 
     def flash_status_message(self, msg, flash_len_ms=1500):
         self.statusbar.SetStatusText(msg)
@@ -328,6 +247,6 @@ class GraphFrame(wx.Frame):
 
 if __name__ == '__main__':
     app = wx.PySimpleApp()
-    app.frame = GraphFrame()
+    app.frame = BarsFrame()
     app.frame.Show()
     app.MainLoop()
