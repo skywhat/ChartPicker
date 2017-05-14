@@ -8,6 +8,8 @@ import datetime as dt
 import data_csv
 from mpldatacursor import datacursor
 
+
+
 #根据path指定的文件构造图标
 class ConstructChart(object):
     def __init__(self,path):
@@ -19,9 +21,9 @@ class ConstructChart(object):
         self.values=self.data_points.values
         self.dates=[dt.datetime.fromtimestamp(ts) for ts in self.test_timeArray]
         self.datenums=md.date2num(self.dates)
-        #self.dpi=100
+        self.dpi=100
         #self.fig=plt.Figure((3.0, 3.0), dpi=self.dpi)
-        self.fig=plt.figure(figsize=(8,4))
+        self.fig=plt.figure(figsize=(8,5),dpi=self.dpi)
         self.ax =self.fig.add_subplot(111)
         #self.fig,self.ax=plt.subplots()
         #self.ax=plt.subplot()
@@ -45,5 +47,5 @@ class ConstructChart(object):
         print 'onpick:', self.index, np.take(self.datenums, self.index), np.take(self.values, self.index)
 
 if __name__=='__main__':
-    path = "samples.csv"
+    path = ""
     ConstructChart(path)
