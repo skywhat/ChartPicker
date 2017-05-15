@@ -71,7 +71,7 @@ class GraphFrame(wx.Frame):
 
     def set_x_axis(self):
         #Set the format of x axis
-        self.xlabels=['Time %i' % i for i in self.datenums]
+        self.xlabels=['Time... %i' % i for i in self.datenums]
         self.axes.set_xticklabels(self.xlabels,rotation=25)
         self.fig.subplots_adjust(bottom=0.2)
         self.xfmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
@@ -86,6 +86,9 @@ class GraphFrame(wx.Frame):
         print 'onpick:', self.index, np.take(self.datenums, self.index), np.take(self.values, self.index)
 
     def on_button_import_click_event(self, event):
+        #self.axes.line.pop(0).remove()
+        self.axes.lines.pop(0)
+        self.axes.clear()
         self.path=self.m_filePicker.GetPath()
         self.get_data(self.path)
         self.set_x_axis()
@@ -94,6 +97,7 @@ class GraphFrame(wx.Frame):
 
         datacursor(self.line)
         self.fig.canvas.mpl_connect('pick_event', self.on_pick)
+        self.canvas.draw()
         self.Update()
 
 if __name__=='__main__':
