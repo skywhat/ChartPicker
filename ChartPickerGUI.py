@@ -1,5 +1,3 @@
-import matplotlib
-matplotlib.use('WXAgg')
 import wx
 import data_csv
 from mpldatacursor import datacursor
@@ -7,7 +5,6 @@ import time
 import datetime as dt
 import matplotlib.dates as md
 
-import process
 import numpy as np
 from matplotlib.backends.backend_wxagg import \
     FigureCanvasWxAgg as FigCanvas, \
@@ -19,25 +16,15 @@ import csv
 class GraphFrame(wx.Frame):
     def __init__(self):
         wx.Frame.__init__(self, None, -1, title=u'ChartPicker')
-        path = "samples.csv"
-        self.create_main_panel(path)
+        #path = "samples.csv"
+        self.create_main_panel()
 
-    def create_main_panel(self, path):
+    def create_main_panel(self):
         self.panel=wx.Panel(self)
         self.fig=Figure()
         self.canvas = FigCanvas(self.panel, -1, self.fig)
         self.axes=self.fig.add_subplot(111)
         self.axes.cla()
-
-        self.get_data(path)
-        self.set_x_axis()
-
-        self.line=self.axes.plot(self.datenums, self.values, '_', marker=r'8',picker=1.5)
-
-        datacursor(self.line)
-        self.fig.canvas.mpl_connect('pick_event', self.on_pick)
-        #collect the data you have clicked
-        self.pick_data=[]
 
         #wxpython controls
         self.vbox = wx.BoxSizer(wx.VERTICAL)
@@ -69,10 +56,21 @@ class GraphFrame(wx.Frame):
         self.num=0
         self.list_ctrl.InsertColumn(1, 'Date',width=150)
         self.list_ctrl.InsertColumn(2, 'Flow',width=150)
+
+        self.vbox_inner=wx.BoxSizer(wx.VERTICAL)
+
+        self.m_button_delete=wx.Button(self.panel, -1, "delete selected one")
+        self.m_button_clear=wx.Button(self.panel,-1,"clear all")
         self.m_button_export = wx.Button(self.panel, -1, "export data now!")
-        self.hbox2.Add(self.list_ctrl)
-        self.hbox2.Add(self.m_button_export)
+        self.vbox_inner.Add(self.m_button_delete)
+        self.vbox_inner.Add(self.m_button_clear)
+        self.vbox_inner.Add(self.m_button_export)
+        self.m_button_delete.Bind(wx.EVT_BUTTON,self.on_button_delete_click_event)
         self.m_button_export.Bind(wx.EVT_BUTTON, self.on_button_export_click_event)
+        self.m_button_clear.Bind(wx.EVT_BUTTON, self.on_button_clear_click_event)
+
+        self.hbox2.Add(self.list_ctrl)
+        self.hbox2.Add(self.vbox_inner)
 
         self.vbox.Add(self.hbox2,0,flag=wx.ALIGN_LEFT|wx.TOP)
 
@@ -110,18 +108,29 @@ class GraphFrame(wx.Frame):
 
         print 'onpick:', self.index, np.take(self.data_points.dates, self.index), np.take(self.values, self.index)
         #print self.pick_data
-        print self.pick_data
-        self.list_ctrl.InsertItem(self.num, self.num)
+        #print self.pick_data
+        point_item="Point %s" % self.num
+        self.list_ctrl.InsertItem(self.num, point_item)
         #self.list_ctrl.SetItem(self.num,0,self.num)
         self.list_ctrl.SetItem(self.num, 1,self.pick_data[-1][0])
         self.list_ctrl.SetItem(self.num, 2, self.pick_data[-1][1])
         self.num+=1
 
     def on_button_import_click_event(self, event):
+        self.path = self.m_filePicker.GetPath()
+        self.get_data(self.path)
+        self.set_x_axis()
+
+        self.line=self.axes.plot(self.datenums, self.values, '_', marker=r'8',picker=1.5)
+
+        datacursor(self.line)
+        self.fig.canvas.mpl_connect('pick_event', self.on_pick)
+                #collect the data you have clicked
+        self.pick_data=[]
         #self.axes.line.pop(0).remove()
         self.axes.lines.pop(0)
         self.axes.clear()
-        self.path=self.m_filePicker.GetPath()
+
         self.get_data(self.path)
         self.set_x_axis()
 
@@ -131,6 +140,13 @@ class GraphFrame(wx.Frame):
         self.fig.canvas.mpl_connect('pick_event', self.on_pick)
         self.canvas.draw()
         self.Update()
+
+    def on_button_delete_click_event(self,event):
+        index=self.list_ctrl.GetFocusedItem()
+        self.list_ctrl.DeleteItem(index)
+
+    def on_button_clear_click_event(self,event):
+        self.list_ctrl.DeleteAllItems()
 
     def on_button_export_click_event(self, event):
         f=file("export.csv","wb")
