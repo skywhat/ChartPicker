@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('WXAgg')
 import wx
 import data_csv
 from mpldatacursor import datacursor
@@ -98,17 +100,12 @@ class GraphFrame(wx.Frame):
         self.axes.xaxis.set_major_formatter(self.xfmt)
         # Set the format of x axis
 
-    def init_plot(self):
-        self.chart=process.ConstructChart(path='samples.csv')
-
     def on_pick(self,event):
         self.index = event.ind
         #self.pick_data.append([np.take(self.data_points.dates, self.index),np.take(self.values, self.index)])
         self.pick_data.append([self.data_points.dates[self.index[0]],self.values[self.index[0]]])
 
-        print 'onpick:', self.index, np.take(self.data_points.dates, self.index), np.take(self.values, self.index)
-        #print self.pick_data
-        #print self.pick_data
+        #print 'onpick:', self.index, np.take(self.data_points.dates, self.index), np.take(self.values, self.index)
         point_item="Point %s" % self.num
         self.list_ctrl.InsertItem(self.num, point_item)
         #self.list_ctrl.SetItem(self.num,0,self.num)
@@ -156,9 +153,8 @@ class GraphFrame(wx.Frame):
             writer.writerow(row)
         f.close()
 
-
 if __name__=='__main__':
-    app=wx.PySimpleApp()
+    app=wx.App()
     app.frame=GraphFrame()
     app.frame.Show()
     app.MainLoop()
