@@ -141,9 +141,11 @@ class GraphFrame(wx.Frame):
     def on_button_delete_click_event(self,event):
         index=self.list_ctrl.GetFocusedItem()
         self.list_ctrl.DeleteItem(index)
+        del self.pick_data[index]
 
     def on_button_clear_click_event(self,event):
         self.list_ctrl.DeleteAllItems()
+        self.pick_data=[]
 
     def on_button_export_click_event(self, event):
         f=file("export.csv","wb")
