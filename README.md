@@ -3,10 +3,15 @@
 import the csv file whose format as follows:
 
 Date,Flow
+
 3/28/2015 0:00,882
+
 3/28/2015 0:15,861
+
 3/28/2015 0:30,839
+
 3/28/2015 0:45,860
+
 
 draw the scatter picture on the panel.
 Click the point you want to save.
@@ -18,6 +23,9 @@ All you have to do is
 The python module you need install as follows:
 
 wxpython
+
 numpy
+
 matplotlib
+
 mpldatacursor
