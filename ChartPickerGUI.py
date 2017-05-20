@@ -42,8 +42,9 @@ class GraphFrame(wx.Frame):
         self.m_button_import = wx.Button(self.panel,  -1, "import data now!")
         self.m_button_import.Bind(wx.EVT_BUTTON, self.on_button_import_click_event)
 
+        self.hbox1.AddSpacer(100)
         self.hbox1.Add(self.m_filePicker,border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
-        self.hbox1.AddSpacer(20)
+        self.hbox1.AddSpacer(145)
         self.hbox1.Add(self.m_button_import,border=5, flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL)
 
         self.vbox.Add(self.hbox1, 0, flag=wx.ALIGN_LEFT | wx.TOP)
@@ -54,10 +55,10 @@ class GraphFrame(wx.Frame):
                                      style=wx.LC_REPORT
                                            | wx.BORDER_SUNKEN
                                      )
-        self.list_ctrl.InsertColumn(0, 'Num',width=150)
+        self.list_ctrl.InsertColumn(0, 'Num',width=50)
         self.num=0
-        self.list_ctrl.InsertColumn(1, 'Date',width=150)
-        self.list_ctrl.InsertColumn(2, 'Flow',width=150)
+        self.list_ctrl.InsertColumn(1, 'Date',width=130)
+        self.list_ctrl.InsertColumn(2, 'Flow',width=130)
 
         self.vbox_inner=wx.BoxSizer(wx.VERTICAL)
 
@@ -71,8 +72,11 @@ class GraphFrame(wx.Frame):
         self.m_button_export.Bind(wx.EVT_BUTTON, self.on_button_export_click_event)
         self.m_button_clear.Bind(wx.EVT_BUTTON, self.on_button_clear_click_event)
 
+        self.hbox2.AddSpacer(100)
         self.hbox2.Add(self.list_ctrl)
+        self.hbox2.AddSpacer(50)
         self.hbox2.Add(self.vbox_inner)
+
 
         self.vbox.Add(self.hbox2,0,flag=wx.ALIGN_LEFT|wx.TOP)
 
@@ -105,13 +109,15 @@ class GraphFrame(wx.Frame):
         #self.pick_data.append([np.take(self.data_points.dates, self.index),np.take(self.values, self.index)])
         self.pick_data.append([self.data_points.dates[self.index[0]],self.values[self.index[0]]])
 
+
         #print 'onpick:', self.index, np.take(self.data_points.dates, self.index), np.take(self.values, self.index)
         point_item="Point %s" % self.num
-        self.list_ctrl.InsertItem(self.num, point_item)
+        new_index=self.list_ctrl.InsertItem(self.num, point_item)
         #self.list_ctrl.SetItem(self.num,0,self.num)
-        self.list_ctrl.SetItem(self.num, 1,self.pick_data[-1][0])
-        self.list_ctrl.SetItem(self.num, 2, self.pick_data[-1][1])
-        self.num+=1
+        self.list_ctrl.SetItem(new_index, 1,self.pick_data[-1][0])
+        self.list_ctrl.SetItem(new_index, 2, self.pick_data[-1][1])
+        self.num += 1
+
 
     def on_button_import_click_event(self, event):
         self.path = self.m_filePicker.GetPath()
@@ -146,6 +152,7 @@ class GraphFrame(wx.Frame):
     def on_button_clear_click_event(self,event):
         self.list_ctrl.DeleteAllItems()
         self.pick_data=[]
+        self.num=0
 
     def on_button_export_click_event(self, event):
         f=file("export.csv","wb")
