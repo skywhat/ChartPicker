@@ -32,6 +32,8 @@ mpldatacursor
 
 Recommend:
 >pip install pyinstaller
+
 >pyinstaller ChartPickerGUI.py
+
 pyinstaller would be a great idea to convert Python scripts into Windows executable program.
 
